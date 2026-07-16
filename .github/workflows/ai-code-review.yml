@@ -64,7 +64,7 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve PR number
+      - name: Resolve PR number and repo info
         id: pr
         run: |
           # Try several paths in the event payload. For PR review comments
@@ -86,6 +86,18 @@ jobs:
           fi
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "Reviewing PR #$PR_NUMBER"
+          
+          # Resolve owner and repo (use inputs if provided, otherwise from event)
+          OWNER="${{ inputs.owner }}"
+          if [ -z "$OWNER" ]; then
+            OWNER=$(jq -r '.repository.owner.login // empty' "$GITHUB_EVENT_PATH")
+          fi
+          REPO="${{ inputs.repo }}"
+          if [ -z "$REPO" ]; then
+            REPO=$(jq -r '.repository.name // empty' "$GITHUB_EVENT_PATH")
+          fi
+          echo "owner=$OWNER" >> "$GITHUB_OUTPUT"
+          echo "repo=$REPO" >> "$GITHUB_OUTPUT"
 
       - name: Determine review type and comment ID
         id: params
@@ -106,13 +118,15 @@ jobs:
         if: steps.params.outputs.type == 'full'
         run: |
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+          OWNER="${{ steps.pr.outputs.owner }}"
+          REPO="${{ steps.pr.outputs.repo }}"
           if [ -z "$PR_NUMBER" ]; then
             echo "::error::PR number is empty — cannot send review request"
             exit 1
           fi
           jq -n \
-            --arg owner "${{ inputs.owner }}" \
-            --arg repo "${{ inputs.repo }}" \
+            --arg owner "$OWNER" \
+            --arg repo "$REPO" \
             --argjson pr_number "$PR_NUMBER" \
             --arg token "${{ secrets.GITHUB_TOKEN }}" \
             '{owner: $owner, repo: $repo, pr_number: $pr_number, github_token: $token}' \
@@ -126,6 +140,8 @@ jobs:
         if: steps.params.outputs.type == 'comment'
         run: |
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
+          OWNER="${{ steps.pr.outputs.owner }}"
+          REPO="${{ steps.pr.outputs.repo }}"
           COMMENT_ID="${{ steps.params.outputs.comment_id }}"
           if [ -z "$PR_NUMBER" ]; then
             echo "::error::PR number is empty — cannot send comment review request"
@@ -136,8 +152,8 @@ jobs:
             exit 1
           fi
           jq -n \
-            --arg owner "${{ inputs.owner }}" \
-            --arg repo "${{ inputs.repo }}" \
+            --arg owner "$OWNER" \
+            --arg repo "$REPO" \
             --argjson pr_number "$PR_NUMBER" \
             --argjson comment_id "$COMMENT_ID" \
             --arg token "${{ secrets.GITHUB_TOKEN }}" \
