@@ -69,9 +69,21 @@ jobs:
       - name: Resolve PR number
         id: pr
         run: |
-          PR_NUMBER="${{ inputs.pr_number || github.event.issue.number || github.event.pull_request.number }}"
+          # Try several paths in the event payload. For PR review comments
+          # the number lives under .issue.number or .pull_request.number.
+          # The event file approach is more reliable than ${{ }} context
+          # variables in reusable workflows.
+          PR_NUMBER="${{ inputs.pr_number }}"
           if [ -z "$PR_NUMBER" ]; then
-            echo "::error::Could not resolve PR number from inputs.pr_number, github.event.issue.number, or github.event.pull_request.number"
+            PR_NUMBER=$(jq -r '
+              (.issue.number // .pull_request.number // empty)
+            ' "$GITHUB_EVENT_PATH")
+          fi
+          if [ -z "$PR_NUMBER" ] || [ "$PR_NUMBER" = "null" ]; then
+            echo "::error::Could not resolve PR number. Event: ${{ github.event_name }}"
+            echo "::group::Event payload keys"
+            jq 'keys' "$GITHUB_EVENT_PATH"
+            echo "::endgroup::"
             exit 1
           fi
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
@@ -80,8 +92,11 @@ jobs:
       - name: Determine review type and comment ID
         id: params
         run: |
-          COMMENT_ID="${{ inputs.comment_id || github.event.comment.id }}"
-          if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "0" ]; then
+          COMMENT_ID="${{ inputs.comment_id }}"
+          if [ -z "$COMMENT_ID" ]; then
+            COMMENT_ID=$(jq -r '(.comment.id // .review_comment.id // empty)' "$GITHUB_EVENT_PATH")
+          fi
+          if [ -n "$COMMENT_ID" ] && [ "$COMMENT_ID" != "0" ] && [ "$COMMENT_ID" != "null" ]; then
             echo "type=comment" >> "$GITHUB_OUTPUT"
             echo "comment_id=$COMMENT_ID" >> "$GITHUB_OUTPUT"
           else
