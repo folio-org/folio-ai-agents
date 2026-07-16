@@ -45,12 +45,10 @@ on:
       owner:
         description: "Repository owner (defaults to triggering repo)"
         required: false
-        default: ${{ github.repository_owner }}
         type: string
       repo:
         description: "Repository name (defaults to triggering repo)"
         required: false
-        default: ${{ github.event.repository.name }}
         type: string
       api_url:
         description: "AI reviewer service URL"
