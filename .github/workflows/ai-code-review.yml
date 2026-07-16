@@ -59,8 +59,8 @@ on:
       ai_pr_reviewer:
         description: "API key for the AI reviewer service (org-level secret)"
         required: true
-      github_token:
-        description: "GitHub token for API access (pass secrets.GITHUB_TOKEN from caller)"
+      gh_token:
+        description: "GitHub token for API access (pass github.token from caller)"
         required: true
 
 jobs:
@@ -129,7 +129,7 @@ jobs:
         env:
           API_URL: ${{ inputs.api_url }}
           API_KEY: ${{ secrets.ai_pr_reviewer }}
-          GITHUB_TOKEN: ${{ secrets.github_token }}
+          GH_TOKEN: ${{ secrets.gh_token }}
         run: |
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
           OWNER="${{ steps.pr.outputs.owner }}"
@@ -142,13 +142,13 @@ jobs:
           echo "Owner: $OWNER"
           echo "Repo: $REPO"
           echo "PR Number: $PR_NUMBER"
-          echo "Token length: ${#GITHUB_TOKEN}"
+          echo "Token length: ${#GH_TOKEN}"
           echo "::endgroup::"
           jq -n \
             --arg owner "$OWNER" \
             --arg repo "$REPO" \
             --argjson pr_number "$PR_NUMBER" \
-            --arg token "$GITHUB_TOKEN" \
+            --arg token "$GH_TOKEN" \
             '{owner: $owner, repo: $repo, pr_number: $pr_number, github_token: $token}' \
             | curl -sf -X POST "$API_URL/review" \
               -H "Content-Type: application/json" \
@@ -161,7 +161,7 @@ jobs:
         env:
           API_URL: ${{ inputs.api_url }}
           API_KEY: ${{ secrets.ai_pr_reviewer }}
-          GITHUB_TOKEN: ${{ secrets.github_token }}
+          GH_TOKEN: ${{ secrets.gh_token }}
         run: |
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
           OWNER="${{ steps.pr.outputs.owner }}"
@@ -180,7 +180,7 @@ jobs:
             --arg repo "$REPO" \
             --argjson pr_number "$PR_NUMBER" \
             --argjson comment_id "$COMMENT_ID" \
-            --arg token "$GITHUB_TOKEN" \
+            --arg token "$GH_TOKEN" \
             '{owner: $owner, repo: $repo, pr_number: $pr_number, comment_id: $comment_id, github_token: $token}' \
             | curl -sf -X POST "$API_URL/review/comment" \
               -H "Content-Type: application/json" \
