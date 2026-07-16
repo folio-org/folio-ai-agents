@@ -78,8 +78,16 @@ jobs:
           # the number lives under .issue.number or .pull_request.number.
           # The event file approach is more reliable than context variables
           # in reusable workflows.
-          echo "::group::Event payload (first 50 lines)"
-          head -50 "$GITHUB_EVENT_PATH"
+          echo "::group::Full Event Payload"
+          cat "$GITHUB_EVENT_PATH"
+          echo "::endgroup::"
+          
+          echo "::group::Event Keys"
+          jq 'keys' "$GITHUB_EVENT_PATH"
+          echo "::endgroup::"
+          
+          echo "::group::Pull Request Info"
+          jq '.pull_request | {number, title}' "$GITHUB_EVENT_PATH"
           echo "::endgroup::"
           
           PR_NUMBER="$INPUT_PR_NUMBER"
