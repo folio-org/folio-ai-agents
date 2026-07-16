@@ -59,6 +59,9 @@ on:
       ai_pr_reviewer:
         description: "API key for the AI reviewer service (org-level secret)"
         required: true
+      github_token:
+        description: "GitHub token for API access (pass secrets.GITHUB_TOKEN from caller)"
+        required: true
 
 jobs:
   review:
@@ -66,12 +69,16 @@ jobs:
     steps:
       - name: Resolve PR number and repo info
         id: pr
+        env:
+          INPUT_PR_NUMBER: ${{ inputs.pr_number }}
+          INPUT_OWNER: ${{ inputs.owner }}
+          INPUT_REPO: ${{ inputs.repo }}
         run: |
           # Try several paths in the event payload. For PR review comments
           # the number lives under .issue.number or .pull_request.number.
-          # The event file approach is more reliable than ${{ }} context
-          # variables in reusable workflows.
-          PR_NUMBER="${{ inputs.pr_number }}"
+          # The event file approach is more reliable than context variables
+          # in reusable workflows.
+          PR_NUMBER="$INPUT_PR_NUMBER"
           if [ -z "$PR_NUMBER" ]; then
             PR_NUMBER=$(jq -r '
               (.issue.number // .pull_request.number // empty)
@@ -88,11 +95,11 @@ jobs:
           echo "Reviewing PR #$PR_NUMBER"
           
           # Resolve owner and repo (use inputs if provided, otherwise from event)
-          OWNER="${{ inputs.owner }}"
+          OWNER="$INPUT_OWNER"
           if [ -z "$OWNER" ]; then
             OWNER=$(jq -r '.repository.owner.login // empty' "$GITHUB_EVENT_PATH")
           fi
-          REPO="${{ inputs.repo }}"
+          REPO="$INPUT_REPO"
           if [ -z "$REPO" ]; then
             REPO=$(jq -r '.repository.name // empty' "$GITHUB_EVENT_PATH")
           fi
@@ -101,8 +108,11 @@ jobs:
 
       - name: Determine review type and comment ID
         id: params
+        env:
+          INPUT_COMMENT_ID: ${{ inputs.comment_id }}
+          INPUT_REVIEW_TYPE: ${{ inputs.review_type }}
         run: |
-          COMMENT_ID="${{ inputs.comment_id }}"
+          COMMENT_ID="$INPUT_COMMENT_ID"
           if [ -z "$COMMENT_ID" ]; then
             COMMENT_ID=$(jq -r '(.comment.id // .review_comment.id // empty)' "$GITHUB_EVENT_PATH")
           fi
@@ -110,17 +120,20 @@ jobs:
             echo "type=comment" >> "$GITHUB_OUTPUT"
             echo "comment_id=$COMMENT_ID" >> "$GITHUB_OUTPUT"
           else
-            echo "type=${{ inputs.review_type }}" >> "$GITHUB_OUTPUT"
+            echo "type=${INPUT_REVIEW_TYPE:-full}" >> "$GITHUB_OUTPUT"
             echo "comment_id=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Request full PR review
         if: steps.params.outputs.type == 'full'
+        env:
+          API_URL: ${{ inputs.api_url }}
+          API_KEY: ${{ secrets.ai_pr_reviewer }}
+          GITHUB_TOKEN: ${{ secrets.github_token }}
         run: |
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
           OWNER="${{ steps.pr.outputs.owner }}"
           REPO="${{ steps.pr.outputs.repo }}"
-          TOKEN="${{ secrets.GITHUB_TOKEN }}"
           if [ -z "$PR_NUMBER" ]; then
             echo "::error::PR number is empty — cannot send review request"
             exit 1
@@ -129,22 +142,26 @@ jobs:
           echo "Owner: $OWNER"
           echo "Repo: $REPO"
           echo "PR Number: $PR_NUMBER"
-          echo "Token length: ${#TOKEN}"
+          echo "Token length: ${#GITHUB_TOKEN}"
           echo "::endgroup::"
           jq -n \
             --arg owner "$OWNER" \
             --arg repo "$REPO" \
             --argjson pr_number "$PR_NUMBER" \
-            --arg token "$TOKEN" \
+            --arg token "$GITHUB_TOKEN" \
             '{owner: $owner, repo: $repo, pr_number: $pr_number, github_token: $token}' \
-            | curl -sf -X POST "${{ inputs.api_url }}/review" \
+            | curl -sf -X POST "$API_URL/review" \
               -H "Content-Type: application/json" \
               -H "Accept: application/json" \
-              -H "X-API-Key: ${{ secrets.ai_pr_reviewer }}" \
+              -H "X-API-Key: $API_KEY" \
               --data-binary @-
 
       - name: Request comment analysis
         if: steps.params.outputs.type == 'comment'
+        env:
+          API_URL: ${{ inputs.api_url }}
+          API_KEY: ${{ secrets.ai_pr_reviewer }}
+          GITHUB_TOKEN: ${{ secrets.github_token }}
         run: |
           PR_NUMBER="${{ steps.pr.outputs.pr_number }}"
           OWNER="${{ steps.pr.outputs.owner }}"
@@ -163,10 +180,10 @@ jobs:
             --arg repo "$REPO" \
             --argjson pr_number "$PR_NUMBER" \
             --argjson comment_id "$COMMENT_ID" \
-            --arg token "${{ secrets.GITHUB_TOKEN }}" \
+            --arg token "$GITHUB_TOKEN" \
             '{owner: $owner, repo: $repo, pr_number: $pr_number, comment_id: $comment_id, github_token: $token}' \
-            | curl -sf -X POST "${{ inputs.api_url }}/review/comment" \
+            | curl -sf -X POST "$API_URL/review/comment" \
               -H "Content-Type: application/json" \
               -H "Accept: application/json" \
-              -H "X-API-Key: ${{ secrets.ai_pr_reviewer }}" \
+              -H "X-API-Key: $API_KEY" \
               --data-binary @-
