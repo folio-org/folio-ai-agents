@@ -1,0 +1,99 @@
+# ── Image ─────────────────────────────────────────────────────────────
+image:
+  repository: 732722833398.dkr.ecr.us-west-2.amazonaws.com/pr-reviewer
+  tag: latest
+  pullPolicy: Always
+
+# ── Service Account (IRSA) ────────────────────────────────────────────
+serviceAccount:
+  create: true
+  name: backend-ai
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::732722833398:role/rancher-bedrock-role
+
+# ── Bedrock ───────────────────────────────────────────────────────────
+bedrock:
+  modelId: anthropic.claude-haiku-4-5-20251001-v1:0
+  region: us-west-2
+  maxTokens: 4096
+  temperature: 0.1
+  topP: 0.9
+  guardrailId: "dy9vh2zwo57n"
+  guardrailVersion: "1"
+
+# ── Token Budget (monthly cost cap) ──────────────────────────────────
+tokenBudget:
+  bucket: folio-ai-agents-prompts
+  prefix: token-usage
+  monthlyBudgetDollars: 1000
+
+# ── Prompts (S3-backed, overridable without redeploy) ────────────────
+prompts:
+  s3Key: prompts/v1/prompts.json
+
+# ── GitHub ────────────────────────────────────────────────────────────
+github:
+  # Shared bot token (optional — users can supply per-request tokens)
+  token: ""
+  # GitHub App credentials (alternative to token)
+  appId: ""
+  # Installation ID (after installing the app on the org)
+  installationId: ""
+  # Private key PEM content (base64-encoded for the Secret)
+  appPrivateKey: ""
+  # Webhook secret (for verifying incoming webhook payloads)
+  # Stored as GitHub org secret AI_PR_REVIEWER — pass via --set during deploy
+  webhookSecret: ""
+  # Bot username shown on comments (default: folio-pr-reviewer[bot])
+  botUsername: "folio-pr-reviewer[bot]"
+
+# ── Service ───────────────────────────────────────────────────────────
+service:
+  type: ClusterIP
+  # nodePort: 30474  # only needed when type=NodePort
+  port: 80
+  targetPort: 8000
+
+# ── Ingress ──────────────────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: alb
+  hostname: pr-reviewer.ci.folio.org
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/group.name: rancher
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80},{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+
+# ── Resources ─────────────────────────────────────────────────────────
+resources:
+  requests:
+    cpu: 256m
+    memory: 512Mi
+  limits:
+    cpu: 1
+    memory: 1Gi
+
+# ── Autoscaling ───────────────────────────────────────────────────────
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# ── Pod ───────────────────────────────────────────────────────────────
+replicaCount: 1
+
+# ── Probes ───────────────────────────────────────────────────────────
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 10
+    periodSeconds: 30
+  readiness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10

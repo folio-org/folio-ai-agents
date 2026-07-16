@@ -1,0 +1,123 @@
+# =====================================================================
+# AI Code Review — Reusable Workflow
+# =====================================================================
+# Source of truth. Consumed by all folio-org repos via `uses:`.
+# When this file is updated, all consuming repos automatically get
+# the latest version (no per-repo changes needed).
+#
+# Usage in a repo's `.github/workflows/ai-code-review.yml`:
+#   name: AI Code Review
+#   on:
+#     pull_request:
+#       types: [opened, synchronize]
+#     pull_request_review_comment:
+#       types: [created]
+#     workflow_dispatch:
+#       inputs:
+#         pr_number:
+#           description: "PR number"
+#           required: true
+#           type: number
+#   jobs:
+#     review:
+#       uses: folio-org/folio-ai-agents/.github/workflows/ai-code-review.yml@main
+#       secrets: inherit
+# =====================================================================
+
+name: AI Code Review (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      pr_number:
+        description: "Pull request number to review"
+        required: false
+        type: number
+      review_type:
+        description: "Type of review: 'full' or 'comment'"
+        required: false
+        default: "full"
+        type: string
+      comment_id:
+        description: "Review comment ID (for comment-type reviews)"
+        required: false
+        type: number
+      owner:
+        description: "Repository owner (defaults to triggering repo)"
+        required: false
+        default: ${{ github.repository_owner }}
+        type: string
+      repo:
+        description: "Repository name (defaults to triggering repo)"
+        required: false
+        default: ${{ github.event.repository.name }}
+        type: string
+      api_url:
+        description: "AI reviewer service URL"
+        required: false
+        default: "https://pr-reviewer.ci.folio.org"
+        type: string
+    secrets:
+      ai_pr_reviewer:
+        description: "API key for the AI reviewer service (org-level secret)"
+        required: true
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve PR number
+        id: pr
+        run: |
+          PR_NUMBER="${{ inputs.pr_number || github.event.pull_request.number }}"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "Reviewing PR #$PR_NUMBER"
+
+      - name: Determine review type and comment ID
+        id: params
+        run: |
+          if [ -n "${{ inputs.comment_id }}" ]; then
+            echo "type=comment" >> "$GITHUB_OUTPUT"
+            echo "comment_id=${{ inputs.comment_id }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "pull_request_review_comment" ]; then
+            echo "type=comment" >> "$GITHUB_OUTPUT"
+            echo "comment_id=${{ github.event.comment.id }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "type=${{ inputs.review_type }}" >> "$GITHUB_OUTPUT"
+            echo "comment_id=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Request full PR review
+        if: steps.params.outputs.type == 'full'
+        run: |
+          curl -sf -X POST ${{ inputs.api_url }}/review \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -H "X-API-Key: ${{ secrets.ai_pr_reviewer }}" \
+            -d "$(cat <<EOF
+          {
+            "owner": "${{ inputs.owner }}",
+            "repo": "${{ inputs.repo }}",
+            "pr_number": ${{ steps.pr.outputs.pr_number }},
+            "github_token": "${{ secrets.GITHUB_TOKEN }}"
+          }
+          EOF
+          )"
+
+      - name: Request comment analysis
+        if: steps.params.outputs.type == 'comment'
+        run: |
+          curl -sf -X POST ${{ inputs.api_url }}/review/comment \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -H "X-API-Key: ${{ secrets.ai_pr_reviewer }}" \
+            -d "$(cat <<EOF
+          {
+            "owner": "${{ inputs.owner }}",
+            "repo": "${{ inputs.repo }}",
+            "pr_number": ${{ steps.pr.outputs.pr_number }},
+            "comment_id": ${{ steps.params.outputs.comment_id }},
+            "github_token": "${{ secrets.GITHUB_TOKEN }}"
+          }
+          EOF
+          )"

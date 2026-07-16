@@ -1,0 +1,6 @@
+apiVersion: v2
+name: pr-reviewer
+description: AI-powered PR reviewer using AWS Bedrock Claude Haiku
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

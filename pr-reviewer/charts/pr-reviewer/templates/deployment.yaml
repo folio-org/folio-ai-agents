@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pr-reviewer.fullname" . }}
+  labels:
+    {{- include "pr-reviewer.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "pr-reviewer.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "pr-reviewer.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      containers:
+        - name: reviewer
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: AWS_REGION
+              value: {{ .Values.bedrock.region }}
+            - name: BEDROCK_MODEL_ID
+              value: {{ .Values.bedrock.modelId }}
+            - name: BEDROCK_MAX_TOKENS
+              value: {{ .Values.bedrock.maxTokens | quote }}
+            - name: BEDROCK_TEMPERATURE
+              value: {{ .Values.bedrock.temperature | quote }}
+            - name: BEDROCK_TOP_P
+              value: {{ .Values.bedrock.topP | quote }}
+            {{- if .Values.bedrock.guardrailId }}
+            - name: BEDROCK_GUARDRAIL_ID
+              value: {{ .Values.bedrock.guardrailId }}
+            - name: BEDROCK_GUARDRAIL_VERSION
+              value: {{ .Values.bedrock.guardrailVersion | default "DRAFT" | quote }}
+            {{- end }}
+            - name: S3_TOKEN_BUCKET
+              value: {{ .Values.tokenBudget.bucket }}
+            - name: S3_TOKEN_PREFIX
+              value: {{ .Values.tokenBudget.prefix }}
+            - name: MONTHLY_BUDGET_DOLLARS
+              value: {{ .Values.tokenBudget.monthlyBudgetDollars | quote }}
+            - name: S3_PROMPTS_BUCKET
+              value: {{ .Values.tokenBudget.bucket }}
+            - name: S3_PROMPTS_KEY
+              value: {{ .Values.prompts.s3Key | default "prompts/v1/prompts.json" }}
+            {{- if .Values.github.token }}
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pr-reviewer.fullname" . }}-secret
+                  key: github-token
+            {{- end }}
+            {{- if .Values.github.appId }}
+            - name: GITHUB_APP_ID
+              value: {{ .Values.github.appId | quote }}
+            - name: GITHUB_APP_INSTALLATION_ID
+              value: {{ .Values.github.installationId | quote }}
+            - name: GITHUB_APP_BOT_USERNAME
+              value: {{ .Values.github.botUsername }}
+            - name: GITHUB_APP_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pr-reviewer.fullname" . }}-secret
+                  key: github-app-private-key
+            {{- end }}
+            {{- if .Values.github.webhookSecret }}
+            - name: GITHUB_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "pr-reviewer.fullname" . }}-secret
+                  key: github-webhook-secret
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: {{ .Values.service.targetPort }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
