@@ -1,16 +1,37 @@
 # AI Code Review for folio-org Repositories
 
-Automated AI-powered pull request reviews using AWS Bedrock Claude Haiku.
+Automated AI-powered pull request reviews using AWS Bedrock Claude Haiku 4.5.
+
+## Architecture
+
+The system consists of three components:
+
+1. **Reusable GitHub Actions Workflow** (`.github/workflows/ai-code-review.yml`)
+   - Triggered on PR events from consuming repositories
+   - Extracts PR metadata (number, owner, repo) and passes to the review service
+   - Posts review comments back to GitHub via GitHub App authentication
+
+2. **Review Service** (FastAPI backend)
+   - Deployed on the rancher Kubernetes cluster (`ai-agents` namespace)
+   - Receives review requests via webhook
+   - Calls AWS Bedrock Claude Haiku 4.5 for code analysis
+   - Tracks token usage and enforces budget limits via S3
+   - Posts review comments to GitHub using GitHub App credentials
+
+3. **GitHub App** (folio-org)
+   - App ID: `4315710`
+   - Installation ID: `147000691`
+   - Handles authentication for posting reviews without a shared bot token
+   - Private key stored in Kubernetes secret
 
 ## How it works
 
-The review logic lives in a single **reusable workflow** at:
-
-```
-folio-org/folio-ai-agents/.github/workflows/ai-code-review.yml
-```
-
-Each repo just needs a thin wrapper that references it with `uses:`. When the reusable workflow is updated, all consuming repos automatically get the changes.
+1. A PR is opened or updated in a folio-org repository
+2. GitHub Actions workflow extracts PR metadata and calls the review service endpoint
+3. Review service fetches the PR diff via GitHub API
+4. Service calls AWS Bedrock Claude Haiku 4.5 for analysis
+5. Token usage is recorded to S3 for budget tracking
+6. Review comment is posted back to the PR via GitHub App
 
 ## How to enable
 
@@ -20,43 +41,71 @@ Copy [`.github/workflows/samples/ai-code-review-repo.yml`](.github/workflows/sam
 .github/workflows/ai-code-review-repo.yml
 ```
 
-That's it. The wrapper delegates to the reusable workflow and inherits all necessary secrets.
+Then update the workflow to pass PR metadata explicitly:
+
+```yaml
+- name: Call AI Code Review
+  uses: folio-org/folio-ai-agents/.github/workflows/ai-code-review.yml@main
+  with:
+    pr_number: ${{ github.event.pull_request.number }}
+    owner: ${{ github.event.repository.owner.login }}
+    repo: ${{ github.event.repository.name }}
+  secrets:
+    gh_token: ${{ secrets.AI_PR_REVIEWER }}
+```
+
+**Important**: Pass PR metadata explicitly via `with:` — GitHub Actions does not provide event context to reusable workflows.
 
 ## What it does
 
 | Trigger | Action |
 |---|---|
-| PR opened or new commits pushed | Full code review — analyzes diff, files, and posts a summary comment with issues found and a quality score |
-| A review comment is created | Analyzes the comment and replies with a code suggestion (if applicable) |
-| Manual (`workflow_dispatch`) | Re-review on demand — supports both full and comment review types |
+| PR opened or new commits pushed | Full code review — analyzes diff and posts a summary comment with issues found and a quality score |
+| Manual (`workflow_dispatch`) | Re-review on demand |
 
 ## Required secrets
 
-None in your repo. The workflow inherits:
+| Secret | Source | Used by |
+|---|---|---|
+| `AI_PR_REVIEWER` | Organization secret (folio-org) | GitHub Actions workflow; passed to review service |
+| `GITHUB_APP_PRIVATE_KEY` | Kubernetes secret (`pr-reviewer-secret`) | Review service; authenticates with GitHub App |
+| `GITHUB_WEBHOOK_SECRET` | Kubernetes secret (`pr-reviewer-secret`) | Review service; validates incoming webhooks |
 
-| Secret | Source |
-|---|---|
-| `AI_PR_REVIEWER` | Inherited from the `folio-org` organization (set by the platform team) |
-| `GITHUB_TOKEN` | Automatically provided by GitHub Actions |
+## Cost control
 
-## Version pinning
+- **AWS Budget**: $1,000/month limit with SNS alerts
+- **S3 Token Tracker**: Cumulative token usage recorded in `folio-ai-agents-prompts` S3 bucket
+- **Hard stop**: Service rejects requests if monthly budget is exceeded
 
-The sample pins to `@main` — you always get the latest version.
+Current usage: ~$0.07/month (as of 2026-07-16)
 
-If you prefer stable releases, watch for tags in `folio-ai-agents` and pin to a specific version:
+## Deployment
 
-```yaml
-uses: folio-org/folio-ai-agents/.github/workflows/ai-code-review.yml@v1
+The review service is deployed via Helm chart:
+
+```bash
+helm upgrade --install pr-reviewer ./charts/pr-reviewer \
+  --namespace ai-agents \
+  --values values.yaml
 ```
+
+**Ingress**: `pr-reviewer.ci.folio.org` (part of rancher ALB group)
+
+**Health check**: `GET /health` returns 200 when service and Bedrock are available
 
 ## Manual re-review
 
-Go to your repository's **Actions** tab, select the **AI Code Review** workflow, and click **Run workflow**. You can specify a PR number and choose between a full review or comment analysis.
+Go to your repository's **Actions** tab, select the **AI Code Review** workflow, and click **Run workflow**. Specify the PR number to re-review.
+
+## Troubleshooting
+
+| Issue | Solution |
+|---|---|
+| Workflow does not appear in Actions tab | Ensure `.github/workflows/ai-code-review-repo.yml` is committed to the repo |
+| Authentication errors | Check that `AI_PR_REVIEWER` secret is set in the organization |
+| Review not posted | Check pod logs: `kubectl logs -n ai-agents -l app=pr-reviewer` |
+| Budget exceeded | Contact platform team; AWS Budget alert will be sent to SNS topic |
 
 ## Questions?
 
-Contact the platform team if:
-
-- The workflow does not appear in your Actions tab
-- You see authentication errors (the `AI_PR_REVIEWER` secret might need updating)
-- You'd like to opt out of automatic reviews
+Contact the platform team if you encounter issues or need to opt out of automatic reviews.
