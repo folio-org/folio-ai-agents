@@ -35,26 +35,43 @@ The system consists of three components:
 
 ## How to enable
 
-Copy [`.github/workflows/samples/ai-code-review-repo.yml`](.github/workflows/samples/ai-code-review-repo.yml) into your repository at:
-
-```
-.github/workflows/ai-code-review-repo.yml
-```
-
-Then update the workflow to pass PR metadata explicitly:
+Copy [`.github/workflows/samples/ai-code-review-repo.yml`](.github/workflows/samples/ai-code-review-repo.yml) into your repository at `.github/workflows/ai-code-review-repo.yml`:
 
 ```yaml
-- name: Call AI Code Review
-  uses: folio-org/folio-ai-agents/.github/workflows/ai-code-review.yml@main
-  with:
-    pr_number: ${{ github.event.pull_request.number }}
-    owner: ${{ github.event.repository.owner.login }}
-    repo: ${{ github.event.repository.name }}
-  secrets:
-    gh_token: ${{ secrets.AI_PR_REVIEWER }}
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  pull_request_review_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: number
+      review_type:
+        description: "Review type"
+        required: true
+        default: "full"
+        type: choice
+        options:
+          - full
+          - comment
+
+jobs:
+  review:
+    uses: folio-org/folio-ai-agents/.github/workflows/ai-code-review.yml@main
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      owner: ${{ github.event.repository.owner.login }}
+      repo: ${{ github.event.repository.name }}
+    secrets:
+      gh_token: ${{ secrets.AI_PR_REVIEWER }}
 ```
 
-**Important**: Pass PR metadata explicitly via `with:` — GitHub Actions does not provide event context to reusable workflows.
+**Important**: PR metadata is passed explicitly via `with:` — GitHub Actions does not provide event context to reusable workflows. The sample above is ready to use as-is.
 
 ## What it does
 
