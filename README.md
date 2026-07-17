@@ -64,7 +64,7 @@ jobs:
   review:
     uses: folio-org/folio-ai-agents/.github/workflows/ai-code-review.yml@main
     with:
-      pr_number: ${{ github.event.pull_request.number }}
+      pr_number: ${{ github.event.inputs.pr_number || github.event.issue.number || github.event.pull_request.number }}
       owner: ${{ github.event.repository.owner.login }}
       repo: ${{ github.event.repository.name }}
     secrets:
