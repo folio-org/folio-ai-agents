@@ -25,7 +25,7 @@ bedrock:
 tokenBudget:
   bucket: folio-ai-agents-prompts
   prefix: token-usage
-  monthlyBudgetDollars: 1000
+  monthlyBudgetDollars: 100
 
 # ── Prompts (S3-backed, overridable without redeploy) ────────────────
 prompts:

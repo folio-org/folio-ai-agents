@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     s3_token_prefix: str = "token-usage"
     s3_prompts_bucket: str = "folio-ai-agents-prompts"
     s3_prompts_key: str = "prompts/v1/prompts.json"
-    monthly_budget_dollars: float = 1000.0
+    monthly_budget_dollars: float = 100.0
 
     # GitHub (optional — users supply tokens per-request)
     github_token: str | None = None

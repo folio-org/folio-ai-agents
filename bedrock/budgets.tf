@@ -1,5 +1,5 @@
 # ── Monthly Budget for Amazon Bedrock ────────────────────────────────
-# Alerts are sent at 50%, 80%, 90%, and 100% of the $1,000 limit.
+# Alerts are sent at 50%, 80%, 90%, and 100% of the $100 limit.
 # This does NOT cap spend — AWS Budgets are alert-only.
 # A hard application-level cap is enforced via the S3 token tracker.
 

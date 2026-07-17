@@ -91,7 +91,7 @@ jobs:
 
 ## Cost control
 
-- **AWS Budget**: $1,000/month limit with SNS alerts
+- **AWS Budget**: $100/month limit with SNS alerts
 - **S3 Token Tracker**: Cumulative token usage recorded in `folio-ai-agents-prompts` S3 bucket
 - **Hard stop**: Service rejects requests if monthly budget is exceeded
 

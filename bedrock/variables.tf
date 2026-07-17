@@ -61,7 +61,7 @@ variable "data_bucket" {
 variable "bedrock_monthly_budget_usd" {
   description = "Monthly budget for Amazon Bedrock usage (USD). Budgets are alert-only — hard enforcement is handled by the app-level S3 token tracker."
   type        = number
-  default     = 1000
+  default     = 100
 }
 
 variable "budget_alert_email" {
