@@ -50,7 +50,9 @@ class GitHubClient:
         # Third priority: GitHub App installation auth
         if self._app_id and self._app_private_key and self._app_installation_id:
             auth = Auth.AppAuth(self._app_id, self._app_private_key)
-            integration = GithubIntegration(auth)
+            # PyGithub >= 2.x: use keyword arg `auth=` — passing AppAuth positionally
+            # triggers AssertionError because position 0 expects integration_id (int|str).
+            integration = GithubIntegration(auth=auth)
             return integration.get_github_for_installation(
                 int(self._app_installation_id)
             )
@@ -58,7 +60,7 @@ class GitHubClient:
         # Fallback: app-level client (read-only, no user context)
         if self._app_id and self._app_private_key:
             auth = Auth.AppAuth(self._app_id, self._app_private_key)
-            integration = GithubIntegration(auth)
+            integration = GithubIntegration(auth=auth)
             return integration.get_github_for_app()
 
         raise ValueError(

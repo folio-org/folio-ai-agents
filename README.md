@@ -69,10 +69,10 @@ jobs:
       repo: ${{ github.event.repository.name }}
     secrets:
       ai_pr_reviewer: ${{ secrets.AI_PR_REVIEWER }}
-      gh_token: ${{ github.token }}
+      gh_token: ${{ secrets.GITHUB_TOKEN }}
 ```
 
-**Important**: PR metadata is passed explicitly via `with:` — GitHub Actions does not provide event context to reusable workflows. The sample above is ready to use as-is.
+**Important**: PR metadata is passed explicitly via `with:` — GitHub Actions does not provide event context to reusable workflows. Use `${{ secrets.GITHUB_TOKEN }}` (not `github.token`) — the latter evaluates to an empty string in the `secrets:` block of `workflow_call` callers. The sample above is ready to use as-is.
 
 ## What it does
 

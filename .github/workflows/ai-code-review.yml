@@ -60,7 +60,7 @@ on:
         description: "API key for the AI reviewer service (org-level secret)"
         required: true
       gh_token:
-        description: "GitHub token for API access (pass github.token from caller)"
+        description: "GitHub token for API access (pass secrets.GITHUB_TOKEN from caller, not github.token)"
         required: true
 
 jobs:
