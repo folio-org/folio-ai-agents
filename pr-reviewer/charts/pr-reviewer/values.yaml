@@ -20,7 +20,7 @@ bedrock:
   # topP intentionally omitted: Bedrock Converse rejects requests that specify
   # both temperature and top_p simultaneously for Claude models.
   guardrailId: "dy9vh2zwo57n"
-  guardrailVersion: "1"
+  guardrailVersion: "3"
 
 # ── Token Budget (monthly cost cap) ──────────────────────────────────
 tokenBudget:

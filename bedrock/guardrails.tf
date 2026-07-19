@@ -1,7 +1,12 @@
 resource "aws_bedrock_guardrail" "this" {
-  name                      = "${var.cluster_name}-guardrail"
-  blocked_input_messaging   = "I can only review code in GitHub repositories under https://github.com/folio-org. Please supply a valid pull request from a folio-org repository."
-  blocked_outputs_messaging = "I cannot answer that request. Please ask for a code review on a pull request from a github.com/folio-org repository."
+  name = "${var.cluster_name}-guardrail"
+
+  # Shown when the guardrail blocks content for safety reasons.
+  # Note: folio-org scope enforcement happens at the application layer
+  # (main.py) before Bedrock is called — these messages cover content-safety
+  # blocks only (hate speech, violence, misconduct, prompt injection, etc.).
+  blocked_input_messaging   = "This content was blocked by the safety policy and cannot be processed."
+  blocked_outputs_messaging = "This response was blocked by the safety policy and cannot be displayed."
 
   content_policy_config {
     filters_config {
@@ -36,20 +41,14 @@ resource "aws_bedrock_guardrail" "this" {
     }
   }
 
-  topic_policy_config {
-    topics_config {
-      name       = "non-folio-code-review"
-      definition = "Pull requests outside github.com/folio-org, personal repos, or unrelated topics like weather, jokes, or feature generation."
-      examples = [
-        "Review this PR from a non-folio-org repo",
-        "Review code from github.com/example/other",
-        "Write a new feature for me",
-        "What is the weather today",
-        "Tell me a joke"
-      ]
-      type = "DENY"
-    }
-  }
+  # topic_policy_config intentionally removed.
+  #
+  # The "non-folio-code-review" deny topic was matching on *diff content*
+  # (e.g. Dockerfiles referencing external images, MCP configs with third-party
+  # URLs) rather than on *user intent*, causing false-positive blocks on
+  # legitimate folio-org PRs.  folio-org scope is enforced at the API layer
+  # (main.py /review and /review/comment endpoints) before Bedrock is called,
+  # so a guardrail topic restriction here is both redundant and harmful.
 
   tags = var.tags
 }
