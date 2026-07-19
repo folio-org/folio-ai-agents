@@ -19,8 +19,14 @@ bedrock:
   temperature: 0.1
   # topP intentionally omitted: Bedrock Converse rejects requests that specify
   # both temperature and top_p simultaneously for Claude models.
-  guardrailId: "dy9vh2zwo57n"
-  guardrailVersion: "3"
+  # guardrailId and guardrailVersion intentionally omitted.
+  # Bedrock content-safety guardrails are incompatible with code review: PR diffs
+  # contain arbitrary code (SQL DDL, shell commands, security tests) that triggers
+  # false positives on PROMPT_ATTACK and MISCONDUCT filters. folio-org scope
+  # enforcement lives at the API layer (main.py). The model's own safety handles
+  # genuinely harmful requests.
+  guardrailId: ""
+  guardrailVersion: ""
 
 # ── Token Budget (monthly cost cap) ──────────────────────────────────
 tokenBudget:
