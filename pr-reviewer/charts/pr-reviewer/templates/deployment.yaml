@@ -31,8 +31,6 @@ spec:
               value: {{ .Values.bedrock.maxTokens | quote }}
             - name: BEDROCK_TEMPERATURE
               value: {{ .Values.bedrock.temperature | quote }}
-            - name: BEDROCK_TOP_P
-              value: {{ .Values.bedrock.topP | quote }}
             {{- if .Values.bedrock.guardrailId }}
             - name: BEDROCK_GUARDRAIL_ID
               value: {{ .Values.bedrock.guardrailId }}

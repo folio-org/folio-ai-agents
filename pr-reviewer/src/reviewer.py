@@ -60,8 +60,9 @@ class PRReviewer:
                 "model": self.settings.bedrock_model_id,
                 "region_name": self.settings.aws_region,
                 "max_tokens": self.settings.bedrock_max_tokens,
+                # Bedrock Converse rejects requests that specify both temperature
+                # and top_p simultaneously — use temperature only.
                 "temperature": self.settings.bedrock_temperature,
-                "top_p": self.settings.bedrock_top_p,
             }
             if guardrails := self._guardrail_config():
                 kwargs["guardrails"] = guardrails
@@ -76,8 +77,9 @@ class PRReviewer:
             "model": self.settings.bedrock_model_id,
             "region_name": self.settings.aws_region,
             "max_tokens": max_tokens,
+            # Bedrock Converse rejects requests that specify both temperature
+            # and top_p simultaneously — use temperature only.
             "temperature": temperature,
-            "top_p": self.settings.bedrock_top_p,
         }
         if guardrails := self._guardrail_config():
             kwargs["guardrails"] = guardrails

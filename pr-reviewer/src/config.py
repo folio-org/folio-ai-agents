@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     bedrock_model_id: str = "anthropic.claude-haiku-4-5-20251001-v1:0"
     bedrock_max_tokens: int = 4096
     bedrock_temperature: float = 0.1
-    bedrock_top_p: float = 0.9
+    # bedrock_top_p is intentionally omitted: Bedrock Converse rejects requests
+    # that specify both temperature and top_p for Claude models.
     bedrock_guardrail_id: str | None = None
     bedrock_guardrail_version: str | None = None
 

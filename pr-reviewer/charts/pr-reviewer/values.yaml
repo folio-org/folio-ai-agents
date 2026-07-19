@@ -17,7 +17,8 @@ bedrock:
   region: us-west-2
   maxTokens: 4096
   temperature: 0.1
-  topP: 0.9
+  # topP intentionally omitted: Bedrock Converse rejects requests that specify
+  # both temperature and top_p simultaneously for Claude models.
   guardrailId: "dy9vh2zwo57n"
   guardrailVersion: "1"
 
