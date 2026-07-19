@@ -80,9 +80,25 @@ class GitHubClient:
     def get_pr_diff(
         self, owner: str, repo: str, pr_number: int, token: str | None = None
     ) -> str:
-        """Fetch the raw diff of a pull request."""
+        """Return a unified-diff-style string for the pull request.
+
+        PyGithub ≥ 2.x dropped the ``get_diff()`` helper on PullRequest.
+        The diff is reconstructed from the per-file patches returned by
+        ``get_files()`` (REST API: GET /repos/{owner}/{repo}/pulls/{pr}/files).
+        The output format matches what ``_extract_diff_hunk`` expects:
+        each file section starts with ``diff --git``, ``--- a/``, ``+++ b/``.
+        """
         pr = self.get_pr(owner, repo, pr_number, token)
-        return pr.get_diff()
+        parts: list[str] = []
+        for f in pr.get_files():
+            parts.append(f"diff --git a/{f.filename} b/{f.filename}")
+            if f.patch:
+                parts.append(f"--- a/{f.filename}")
+                parts.append(f"+++ b/{f.filename}")
+                parts.append(f.patch)
+            else:
+                parts.append("(binary or truncated — no patch available)")
+        return "\n".join(parts)
 
     def get_pr_files(
         self,
