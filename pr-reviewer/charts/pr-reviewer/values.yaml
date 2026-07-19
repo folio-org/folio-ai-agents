@@ -13,7 +13,7 @@ serviceAccount:
 
 # ── Bedrock ───────────────────────────────────────────────────────────
 bedrock:
-  modelId: anthropic.claude-haiku-4-5-20251001-v1:0
+  modelId: us.anthropic.claude-haiku-4-5-20251001-v1:0
   region: us-west-2
   maxTokens: 4096
   temperature: 0.1
